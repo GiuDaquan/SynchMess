@@ -87,5 +87,5 @@ Several different aspects will be considered to give the final mark on the proje
 - clarity and quality of the associated documentation;
 - good usage of git.
 
-##Documentation
+## Documentation
 A full description of the projext functionalities can be accessed [here](https://docs.google.com/document/d/1-uAV8_0grgDvinclSvaA28xejokO_SxC9KcQPoxK5qU/edit?usp=sharing)

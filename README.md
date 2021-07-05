@@ -1,5 +1,8 @@
 # AOSV 2019/2020 Final Project: Thread Synchronization and Messaging Subsystem
 
+## Documentation
+A full description of the project functionalities can be accessed [here](https://docs.google.com/document/d/1-uAV8_0grgDvinclSvaA28xejokO_SxC9KcQPoxK5qU/edit?usp=sharing)
+
 ## Specification
 
 This year project involves the design and development of a subsystem for the Linux kernel which allows threads from (different) processes to exchange units of information (aka messages) and synchronize with each other.
@@ -86,6 +89,3 @@ Several different aspects will be considered to give the final mark on the proje
 - performance and correctness of the code;
 - clarity and quality of the associated documentation;
 - good usage of git.
-
-## Documentation
-A full description of the projext functionalities can be accessed [here](https://docs.google.com/document/d/1-uAV8_0grgDvinclSvaA28xejokO_SxC9KcQPoxK5qU/edit?usp=sharing)

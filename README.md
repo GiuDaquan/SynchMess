@@ -1,7 +1,7 @@
 # AOSV 2019/2020 Final Project: Thread Synchronization and Messaging Subsystem
 
 ## Documentation
-A full description of the project functionalities can be accessed [here](https://docs.google.com/document/d/1-uAV8_0grgDvinclSvaA28xejokO_SxC9KcQPoxK5qU/edit?usp=sharing)
+A full description of the project functionalities can be accessed [here](https://docs.google.com/document/d/1-uAV8_0grgDvinclSvaA28xejokO_SxC9KcQPoxK5qU/edit?usp=sharing).
 
 ## Specification
 

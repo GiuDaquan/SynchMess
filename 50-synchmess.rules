@@ -1,0 +1,2 @@
+KERNEL=="synch/synchmess", MODE="0444"
+KERNEL=="synch/synchmess[1-9]*", MODE="0666"

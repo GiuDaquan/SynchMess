@@ -1,44 +1,78 @@
-# SynchMess: Linux Kernel Thread Synchronization & Messaging Subsystem
+# Advanced Operating Systems and Virtualization 2019/2020 Final Project: Thread Synchronization and Messaging Subsystem
 
-**Advanced Operating Systems and Virtualization (AOSV) - Final Project (2019/2020)** *Sapienza University of Rome*
+## Specification
 
-## Overview
-SynchMess is an out-of-tree Linux kernel character driver that implements a robust IPC (Inter-Process Communication) and thread synchronization subsystem. It allows threads from distinct processes to exchange messages with strictly defined delivery semantics and synchronize execution flows via kernel-level barriers. 
+This project involves the design and development of a subsystem for the Linux kernel which allows threads from (different) processes to exchange units of information (aka messages) and synchronize with each other.
 
-The project demonstrates deep integration with Linux kernel internals, including the Virtual File System (VFS), memory management, preemption-safe locking primitives, and deferred work scheduling.
+The subsystem works according to the concept of *groups* to orchestrate which threads can synchronize and exchange messages. A group boils down to the creation of a device file in the `/dev/synch/` folder. Threads (from any process) can use a custom-defined `group_t` type to tell what is the group of threads they want to synchronize/exchange messages with.
 
-## Core Architecture
+The subsystem offers five fundamental primitives:
+* **Install a group**: by providing a `group_t` descriptor to the subsystem, a new device file is installed only if a corresponding device is not existing. The path to the corresponding device file is returned.
+* **Send a message**: a new unit of information is delivered to the subsystem via a `write()` system call.
+* **Retrieve a message**: a previously-sent unit of information is delivered to the caller in FIFO order via a `read()` system call.
+* **Sleep on barrier**: a thread calling this primitive is descheduled and will not be re-scheduled until it is explicitly woken up.
+* **Awake barrier**: all threads sleeping on a barrier are woken up.
 
-### 1. Master/Worker VFS Multiplexing
-The subsystem avoids polluting the root `/dev` directory by employing a hierarchical device layout managed through custom `udev` rules.
-* **Master Device (`/dev/synch/synchmess`):** Acts as a control-plane endpoint. Threads interact with it exclusively via `ioctl()` to dynamically provision new communication "groups" (device nodes).
-* **Worker Devices (`/dev/synch/synchmess[X]`):** Dynamically spawned endpoints mapped to specific minor numbers. These handle the actual data-plane I/O (`read()`, `write()`, `fsync()`).
+Each message posted to the device file is an independent data unit. The message receipt fully invalidates the content of the message to be delivered to the user land buffer (exactly-once delivery semantic). Both `write()` and `read()` operations can be controlled by relying on the `ioctl()` interface:
+* `SET_SEND_DELAY`: sets the associated group to a mode that stores messages after a timeout (in milliseconds) without blocking the caller.
+* `REVOKE_DELAYED_MESSAGES`: allows retracting all delayed messages for which the delay timer has not expired.
 
-### 2. Concurrency and Safe Locking
-Handling concurrent I/O from multiple multi-threaded processes requires strict adherence to kernel locking rules to avoid race conditions and `BUG: scheduling while atomic` panics.
-* **Mutexes:** Device installation (`IOCTL_INSTALL_GROUP`) and delayed message queuing are protected by kernel `mutex` constructs, ensuring deterministic scheduling and preventing priority inversion.
-* **Read/Write Spinlocks:** The core message queue per group is protected by `rwlock_t`. To safely deliver data to user-space without holding an atomic lock (which would panic on `copy_to_user` page faults), the driver implements an O(1) *Pop-and-Process* logic. The message is atomically detached from the list under a write-lock, and the copy operation is performed lock-free.
-* **Waitqueues:** Thread synchronization (`IOCTL_SLEEP` and `IOCTL_AWAKE`) is implemented natively using Linux `wait_queue_head_t`, putting threads to sleep (`TASK_INTERRUPTIBLE`) with zero CPU overhead until an awake event occurs.
+The system call `flush()` must be supported in order to cancel the effect of the delay. If a special device file is flushed, all delayed messages are made immediately available to subsequent `read()` calls.
 
-### 3. Asynchronous Execution (Workqueues)
-The driver supports delayed message delivery. When `IOCTL_SET_SEND_DELAY` is invoked, `write()` calls return immediately to user-space, but the actual message publication is deferred.
-This is achieved by instantiating a custom `workqueue_struct`. Delayed messages are wrapped in `delayed_work` structs and pushed to the kernel's worker threads, simulating asynchronous timed execution entirely within Ring 0.
+The kernel exposes via the `/sys` file system the following reconfigurable parameters:
+* `max_message_size`: the maximum size (bytes) currently allowed for posting messages to the device file.
+* `max_storage_size`: the maximum number of bytes globally allowed for keeping messages in the device file.
 
-## Implementation Details & Semantics
-* **Delivery:** Exactly-once FIFO delivery. Once a message is read, it is definitively destroyed from the kernel heap.
-* **Memory Management:** Robust memory footprint control via `atomic_t` size limits, ensuring the module cannot be used to exhaust kernel heap (DoS).
-* **Flush:** Implementation of the `fsync` system call to manually force the execution of pending delayed work.
+---
 
-## Build and Execution
+## Build and Execution Commands
 
 ### Prerequisites
-* Linux environment (tested on Ubuntu/Debian)
-* `build-essential` and `linux-headers` for the active kernel
+* Linux environment
+* `build-essential` and `linux-headers-$(uname -r)`
 * `udev` daemon
 
-### Installation
-1. Install the `udev` rules to handle dynamic device permissions:
-   ```bash
-   sudo cp 50-synchmess.rules /etc/udev/rules.d/
-   sudo udevadm control --reload-rules
-   sudo udevadm trigger
+### 1. Installation and Module Injection
+First, install the `udev` rules to handle dynamic device permissions properly:
+```bash
+sudo cp 50-synchmess.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+Build the kernel module and the multi-threaded benchmarking suite:
+```bash
+make all
+```
+
+Insert the compiled module (synchmess.ko) into the running kernel:
+```bash
+sudo insmod synchmess.ko
+```
+(Verify the successful installation by checking the kernel logs: dmesg | tail)
+
+### 2. Running the Functional Test
+The repository includes a standard C application (test.c) to functionally verify the basic IPC operations (device creation, standard messaging, delayed messaging, and fsync flushing) with error handling.
+Compile and run the test application:
+
+```bash
+gcc test.c -o test_app
+./test_app
+```
+
+### 3. Running the Multi-Threaded Benchmark
+To perform stress testing on the kernel locks under heavy concurrency, run the benchmarking suite. This will spawn multiple producer and consumer threads to hammer the VFS endpoints.
+You can launch the automated bash script:
+
+```bash
+chmod +x benchmark.sh
+./benchmark.sh
+```
+
+### 4. Uninstallation
+When finished, cleanly remove the module from the kernel and purge the build artifacts:
+
+```bash
+sudo rmmod synchmess
+make clean
+```

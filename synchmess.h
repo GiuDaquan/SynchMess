@@ -5,9 +5,6 @@
 #include <linux/wait.h>
 #include <linux/workqueue.h>
 
-
-
-// Home directory for the synchemss devices
 #define DEVICES_HOME_DIR "/dev/synch/\0"
 
 struct group {
@@ -26,7 +23,6 @@ struct group {
 
 struct message {
 	struct list_head list;
-	atomic_t delivered;
 	size_t buf_size;
 	char *buffer;
 };

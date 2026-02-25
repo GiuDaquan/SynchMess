@@ -13,8 +13,8 @@
 
 
 
-static char standard_rw_time_elapsed = 0;
-static char delayed_rw_time_elapsed = 0;
+static volatile char standard_rw_time_elapsed = 0;
+static volatile char delayed_rw_time_elapsed = 0;
 static struct group_t group_descriptors[NUM_GROUPS];
 static int fds[NUM_GROUPS];
 
@@ -110,7 +110,7 @@ int main(int argc, char **argv)
 	printf("main_producer: opening all devices...\n");
 	for (i = 0; i < NUM_GROUPS; i++) {
 		while (access(group_descriptors[i].device_path, R_OK | W_OK)) {
-			continue;
+			usleep(10000); // FIX: Previene il blocco della CPU al 100%
 		}
 		fds[i] = open(group_descriptors[i].device_path, O_RDWR);
 		if (fds[i] < 0) {
